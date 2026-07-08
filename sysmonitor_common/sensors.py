@@ -45,6 +45,14 @@ def get_default_iface():
     except Exception:
         return None
         
+def _default_iface_usage():
+    iface = get_default_iface()
+    if iface:
+        iostat = ps.net_io_counters(pernic=True).get(iface)
+        if iostat:
+            return [iostat.bytes_recv, iostat.bytes_sent]
+    return [0, 0]
+
 def bytes_to_human(num):
     for unit in B_UNITS:
         if abs(num) < 1000.0:
@@ -538,10 +546,7 @@ class NetSensor(BaseSensor):
 
     def _fetch_net(self):
         """It returns the bytes sent and received in bytes/second"""
-        current = [0, 0]
-        for _, iostat in list(ps.net_io_counters(pernic=True).items()):
-            current[0] += iostat.bytes_recv
-            current[1] += iostat.bytes_sent
+        current = _default_iface_usage()
         dummy = copy.deepcopy(current)
 
         current[0] -= self._last_net_usage[0]
@@ -562,10 +567,7 @@ class NetCompSensor(BaseSensor):
 
     def _fetch_net(self):
         """It returns the bytes sent and received in bytes/second"""
-        current = [0, 0]
-        for _, iostat in list(ps.net_io_counters(pernic=True).items()):
-            current[0] += iostat.bytes_recv
-            current[1] += iostat.bytes_sent
+        current = _default_iface_usage()
         dummy = copy.deepcopy(current)
 
         current[0] -= self._last_net_usage[0]
@@ -604,22 +606,7 @@ class SimpleNetSensor(BaseSensor):
         return self._fetch_net()
 
     def _fetch_net(self):
-        rx = 0
-        tx = 0
-
-        iface = get_default_iface()
-
-        if not iface:
-            iface = "enp3s0"
-
-        net = ps.net_io_counters(pernic=True)
-
-        if iface in net:
-            iostat = net[iface]
-            rx = iostat.bytes_recv
-            tx = iostat.bytes_sent
-
-        current = [rx, tx]
+        current = _default_iface_usage()
 
         if self._last_net_usage == [0, 0]:
             self._last_net_usage = copy.deepcopy(current)
